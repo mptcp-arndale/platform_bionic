@@ -481,6 +481,9 @@ ifeq ($(TARGET_ARCH),arm)
   ifeq ($(ARCH_ARM_USE_NON_NEON_MEMCPY),true)
     libc_common_cflags += -DARCH_ARM_USE_NON_NEON_MEMCPY
   endif
+  ifeq ($(TARGET_BOARD_PLATFORM), exynos5)
+    libc_common_cflags += -DCORTEX_CACHE_LINE_64
+  endif
 else # !arm
   ifeq ($(TARGET_ARCH),x86)
     libc_crt_target_cflags :=
