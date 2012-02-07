@@ -26,14 +26,116 @@
  * SUCH DAMAGE.
  */
 
+#include <machine/cpu-features.h>
 #include <machine/asm.h>
 	
-		/*
-		 * Optimized memset() for ARM.
-         *
-         * memset() returns its first argument.
-		 */
-	
+
+#if defined(__ARM_NEON__) && !defined(SAMSUNG_DISABLE_NEON_MEMCPY)
+
+	.code 32
+	.align 8
+	.global memset
+	.type memset, %function
+
+	.global bzero
+	.type bzero, %function
+
+bzero:
+	mov		r2, r1
+	mov		r1, #0
+
+memset:
+	mov		r12, r0
+
+.nmenset_alined:
+	cmp		r2, #4
+	blt		.nmemset
+	vdup.8		q0, r1
+	cmp		r2, #16
+	blt		.nmemset8
+	vmov		q1, q0
+
+	cmp		r2, #256
+	blt		.nmemset128
+	sub		r2, r2, #256
+
+.nmemset256:
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	subs		r2, r2, #256
+	bge		.nmemset256
+	adds		r2, r2, #256
+	beq		.nmemset_end
+
+.nmemset128:
+	cmp		r2, #128
+	blt		.nmemset64
+	subs		r2, r2, #128
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	beq		.nmemset_end
+
+.nmemset64:
+	cmp		r2, #64
+	blt		.nmemset32
+	subs		r2, r2, #64
+	vst1.32		{q0, q1}, [r0]!
+	vst1.32		{q0, q1}, [r0]!
+	beq		.nmemset_end
+
+.nmemset32:
+	cmp		r2, #32
+	blt		.nmemset16
+	subs		r2, r2, #32
+	vst1.32		{q0, q1}, [r0]!
+	beq		.nmemset_end
+
+.nmemset16:
+	cmp		r2, #16
+	blt		.nmemset8
+	subs		r2, r2, #16
+	vst1.16		{q0}, [r0]!
+	beq		.nmemset_end
+
+.nmemset8:
+	cmp		r2, #8
+	blt		.nmemset4
+	subs		r2, r2, #8
+	vst1.8		{d0}, [r0]!
+	beq		.nmemset_end
+
+.nmemset4:
+	tst		r2, #4
+	vmovne		r1, s0
+	strne		r1, [r0], #4
+
+.nmemset:
+	tst		r2, #2
+	strneb		r1, [r0], #1
+	strneb		r1, [r0], #1
+	tst		r2, #1
+	strneb		r1, [r0], #1
+
+.nmemset_end:
+	mov		r0, r12
+	bx		lr
+
+#else   /* __ARM_ARCH__ < 7 */
+
+/*
+* Optimized memset() for ARM.
+*
+* memset() returns its first argument.
+*/
+
 ENTRY(bzero)
         mov     r2, r1
         mov     r1, #0
@@ -107,3 +209,4 @@ ENTRY(memset)
         ldmfd		sp!, {r0, r4-r7, lr}
         bx          lr
 END(memset)
+#endif
